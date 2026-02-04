@@ -51,19 +51,28 @@ def _resolve_groww_token():
     return USER_API_KEY
 
 
-# Initialize Groww API
+# Initialize Groww API (SAFE MODE)
 groww = None
 resolved_token = _resolve_groww_token()
-if resolved_token:
-    try:
+
+try:
+    if resolved_token:
         groww = GrowwAPI(resolved_token)
         app.logger.info("Initialized GrowwAPI with access token")
-    except Exception:
-        app.logger.exception("Failed initializing GrowwAPI with access token")
+except Exception as e:
+    app.logger.error(f"Groww API initialization failed: {e}")
 
+# If Groww API failed -> SAFE MOCK MODE (prevents deployment crash)
 if not groww:
-    app.logger.error("Could not initialize GrowwAPI. Check provided credentials.")
-    raise RuntimeError("Could not initialize GrowwAPI. Check provided credentials.")
+    app.logger.warning("GrowwAPI FAILED — backend running in SAFE MODE with mock responses")
+
+    class SafeGroww:
+        def __getattr__(self, name):
+            def fallback(*args, **kwargs):
+                return {}   # Always return empty data instead of crashing
+            return fallback
+
+    groww = SafeGroww()
 
 # Extended list of 300+ popular stocks
 POPULAR_STOCKS = [
